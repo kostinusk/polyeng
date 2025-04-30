@@ -1,14 +1,7 @@
 import copy
 import random
 import time
-import pygame
 
-# Constants for Pygame rendering
-CELL_SIZE = 60
-MARGIN = 5
-WINDOW_WIDTH = 400
-WINDOW_HEIGHT = 400
-FPS = 2
 
 class Unit:
     def __init__(self, player, x, y, strength=1):
@@ -17,12 +10,14 @@ class Unit:
         self.y = y
         self.strength = strength
 
+
 class City:
     def __init__(self, player, x, y, population=1):
         self.player = player
         self.x = x
         self.y = y
         self.population = population
+
 
 class GameState:
     def __init__(self, width=5, height=5):
@@ -53,45 +48,55 @@ class GameState:
         moves = []
         for unit in self.units:
             if unit.player == self.current_player:
-                for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                     nx, ny = unit.x + dx, unit.y + dy
                     if 0 <= nx < self.width and 0 <= ny < self.height:
                         target = self.get_unit_at(nx, ny)
                         if target and target.player != unit.player:
-                            moves.append(('attack', unit, target))
+                            moves.append(("attack", unit, target))
                         else:
-                            moves.append(('move', unit, nx, ny))
-                if 'build' in self.technologies[self.current_player]:
+                            moves.append(("move", unit, nx, ny))
+                if "build" in self.technologies[self.current_player]:
                     if not self.get_city_at(unit.x, unit.y):
-                        moves.append(('build_city', unit))
+                        moves.append(("build_city", unit))
         if random.random() < 0.3:
-            new_tech = random.choice(['build', 'sailing'])
+            new_tech = random.choice(["build", "sailing"])
             if new_tech not in self.technologies[self.current_player]:
-                moves.append(('research', new_tech))
+                moves.append(("research", new_tech))
         return moves
 
     def apply_move(self, move):
         new_state = copy.deepcopy(self)
         action = move[0]
 
-        if action == 'move':
+        if action == "move":
             _, unit, x, y = move
             for u in new_state.units:
                 if u.x == unit.x and u.y == unit.y and u.player == unit.player:
                     u.x, u.y = x, y
 
-        elif action == 'attack':
+        elif action == "attack":
             _, attacker, target = move
-            new_state.units = [u for u in new_state.units if not (u.x == target.x and u.y == target.y and u.player == target.player)]
+            new_state.units = [
+                u
+                for u in new_state.units
+                if not (
+                    u.x == target.x and u.y == target.y and u.player == target.player
+                )
+            ]
             for u in new_state.units:
-                if u.x == attacker.x and u.y == attacker.y and u.player == attacker.player:
+                if (
+                    u.x == attacker.x
+                    and u.y == attacker.y
+                    and u.player == attacker.player
+                ):
                     u.strength += 1
 
-        elif action == 'build_city':
+        elif action == "build_city":
             _, unit = move
             new_state.cities.append(City(unit.player, unit.x, unit.y))
 
-        elif action == 'research':
+        elif action == "research":
             _, tech = move
             new_state.technologies[new_state.current_player].add(tech)
 
@@ -120,20 +125,17 @@ class GameState:
         score += len(self.technologies[self.current_player]) * 2
         return score
 
-    def render_pygame(self, screen):
-        screen.fill((200, 200, 200))
-        colors = [(100, 200, 255), (255, 150, 150)]
-        for y in range(self.height):
-            for x in range(self.width):
-                rect = pygame.Rect(x * (CELL_SIZE + MARGIN), y * (CELL_SIZE + MARGIN), CELL_SIZE, CELL_SIZE)
-                pygame.draw.rect(screen, (240, 240, 240), rect)
-                city = self.get_city_at(x, y)
-                unit = self.get_unit_at(x, y)
-                if city:
-                    pygame.draw.circle(screen, colors[city.player], rect.center, 10)
-                if unit:
-                    pygame.draw.circle(screen, colors[unit.player], rect.center, 20, 2)
-        pygame.display.flip()
+    def render(self):
+        grid = [["." for _ in range(self.width)] for _ in range(self.height)]
+        for city in self.cities:
+            grid[city.y][city.x] = "C" + str(city.player)
+        for unit in self.units:
+            grid[unit.y][unit.x] = "U" + str(unit.player)
+        print("\nCurrent map (P{}'s turn):".format(self.current_player))
+        for row in grid:
+            print(" ".join(row))
+        print("-------------------------")
+
 
 def minimax(state, depth, maximizing_player):
     if depth == 0:
@@ -143,7 +145,7 @@ def minimax(state, depth, maximizing_player):
     if not moves:
         return state.evaluate(), None
 
-    best_value = float('-inf') if maximizing_player else float('inf')
+    best_value = float("-inf") if maximizing_player else float("inf")
     best_move = None
 
     for move in moves:
@@ -156,27 +158,17 @@ def minimax(state, depth, maximizing_player):
 
     return best_value, best_move
 
-if __name__ == "__main__":
-    pygame.init()
-    screen = pygame.display.set_mode((400, 400))
-    pygame.display.set_caption("Polytopia Prototype")
-    clock = pygame.time.Clock()
 
+if __name__ == "__main__":
     state = GameState()
     state.units = [Unit(0, 1, 1), Unit(1, 3, 3)]
     state.cities = [City(0, 0, 0), City(1, 4, 4)]
 
-    for _ in range(20):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-
-        state.render_pygame(screen)
+    for _ in range(10):
+        state.render()
         score, best_move = minimax(state, depth=2, maximizing_player=True)
         if best_move is None:
+            print("No valid moves for player", state.current_player)
             break
         state = state.apply_move(best_move)
-        clock.tick(FPS)
-
-    pygame.quit()
+        time.sleep(0.5)
